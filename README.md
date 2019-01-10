@@ -1,2 +1,1 @@
-# kubeconfig-mixer
-a kubernetes config mixer
+## kubecfg composer
