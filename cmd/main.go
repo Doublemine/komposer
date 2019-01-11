@@ -9,11 +9,11 @@ import (
 
 func main() {
 
-	parser := argparse.NewParser("composer", "a terminal tools that let you multiple k8s config file merge as single one")
+	parser := argparse.NewParser("komposer", "a terminal tools that let you multiple k8s config file merge as single one")
 	version := parser.Flag("v", "version", &argparse.Options{Required: false, Help: "show composer version"})
 	force := parser.Flag("f", "force", &argparse.Options{Required: false, Help: "force overwrite kubeconfig file if exists"})
 	special := parser.Flag("s", "special", &argparse.Options{Required: false, Help: "save on user dir after compose"})
-	configList := parser.List("c", "config", &argparse.Options{Required: true, Help: "the kubeconfig file path, can be repeat. such as: -c /path/to/config -c /path/to/others "})
+	configList := parser.List("c", "config", &argparse.Options{Required: false, Help: "the kubeconfig file path, can be repeat. such as: -c /path/to/config -c /path/to/others "})
 	// Parse input
 	err := parser.Parse(os.Args)
 	if err != nil {
@@ -22,10 +22,20 @@ func main() {
 		fmt.Println(parser.Usage(err))
 	}
 
-	err = core.KubeConfigVerifier(*configList)
-	if err != nil {
-		fmt.Println(parser.Usage(err))
+	if *version {
+		core.ShowVersion()
+		return
 	}
-	// Finally print the collected string
-	fmt.Println(*version, *force, *special, *configList)
+
+	if len(*configList) > 1 {
+		err = core.KubeConfigVerifier(*configList)
+		if err != nil {
+			fmt.Println(parser.Usage(err))
+			return
+		}
+		core.Compose(*configList, *force, *special)
+		return
+	}
+
+	fmt.Println(parser.Usage(nil))
 }
