@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/Doublemine/kubeconfig-mixer/core"
+	"github.com/Doublemine/komposer/core"
 	"github.com/akamensky/argparse"
 	"os"
 )

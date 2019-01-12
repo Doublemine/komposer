@@ -2,7 +2,7 @@ package core
 
 import (
 	"fmt"
-	"github.com/Doublemine/kubeconfig-mixer/model"
+	"github.com/Doublemine/komposer/model"
 	"gopkg.in/yaml.v2"
 	"io/ioutil"
 	"log"
