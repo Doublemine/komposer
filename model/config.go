@@ -42,3 +42,9 @@ type Config struct {
 	Contexts       []Contexts  `yaml:"contexts"`
 	Users          []Users     `yaml:"users"`
 }
+
+type MidConfigWare struct {
+	Cluster Clusters
+	Context Contexts
+	User    Users
+}
