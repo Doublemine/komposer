@@ -2,9 +2,9 @@ package core
 
 import (
 	"github.com/Doublemine/komposer/model"
+	log "github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v2"
 	"io/ioutil"
-	"log"
 )
 
 func Compose(paths []string, isForce bool, isSpecial bool) {
@@ -14,11 +14,12 @@ func Compose(paths []string, isForce bool, isSpecial bool) {
 	}
 
 	for _, config := range configList {
-		spearator(config)
+		separator(config)
 	}
 
 }
 
+// parse to kube-config by file path.
 func parse2Config(path string) model.Config {
 	content, err := ioutil.ReadFile(path)
 	if err != nil {
@@ -32,12 +33,14 @@ func parse2Config(path string) model.Config {
 	return auth
 }
 
-func spearator(config model.Config) map[string]model.Config {
+func separator(config model.Config) map[string]model.Config {
 	eachCluster := make(map[string]model.Config)
 
 	if len(config.Clusters) != len(config.Contexts) {
 		log.Fatalln("only support the same num config.")
 	}
+
+	filter2MidWare(config)
 
 	return eachCluster
 }
@@ -49,8 +52,9 @@ func filter2MidWare(config model.Config) []model.MidConfigWare {
 
 	log.Println("cluster:", clusterMap, "\ncontextMap:", contextMap, "\nuserMap", userMap)
 
-	var midWareMap map[string]model.MidConfigWare
-	for k, v := range contextMap {
+	//var midWareMap map[string]model.MidConfigWare
+	//may lost context name.
+	for _, v := range contextMap {
 
 		temp := model.MidConfigWare{
 			Context: v,
@@ -58,19 +62,24 @@ func filter2MidWare(config model.Config) []model.MidConfigWare {
 		cluster, ok := clusterMap[v.Context.Cluster]
 		if ok {
 			temp.Cluster = cluster
+		} else {
+			//TODO
+			log.Fatalln("the cluster not exist!")
 		}
 
 		user, ok := userMap[v.Context.User]
 		if ok {
 			temp.User = user
-		}
-		if cluster != nil && cluster.Cluster.Server != "" {
-			midWareMap[cluster.Cluster.Server] = temp
+		} else {
+			//TODO
+			log.Fatalln("the user not exist!")
 		}
 
 	}
+	return nil
 }
 
+// map to dict, cluster server url as key
 func map2Cluster(clusters model.Config) map[string]model.Clusters {
 	clusterMap := make(map[string]model.Clusters)
 	for _, cluster := range clusters.Clusters {
@@ -83,6 +92,7 @@ func map2Cluster(clusters model.Config) map[string]model.Clusters {
 	return clusterMap
 }
 
+// map to dict, config name as key
 func map2Context(clusters model.Config) map[string]model.Contexts {
 
 	clusterMap := make(map[string]model.Contexts)
@@ -96,6 +106,7 @@ func map2Context(clusters model.Config) map[string]model.Contexts {
 	return clusterMap
 }
 
+// map to dict, user name as key
 func map2User(clusters model.Config) map[string]model.Users {
 
 	clusterMap := make(map[string]model.Users)
