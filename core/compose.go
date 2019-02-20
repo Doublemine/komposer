@@ -1,10 +1,12 @@
 package core
 
 import (
+	"fmt"
 	"github.com/Doublemine/komposer/model"
 	log "github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v2"
 	"io/ioutil"
+	"reflect"
 )
 
 func Compose(paths []string, isForce bool, isSpecial bool) {
@@ -12,11 +14,8 @@ func Compose(paths []string, isForce bool, isSpecial bool) {
 	for _, path := range paths {
 		configList = append(configList, parse2Config(path))
 	}
-
-	for _, config := range configList {
-		separator(config)
-	}
-
+	conbin := separator(configList)
+	fmt.Println(len(conbin))
 }
 
 // parse to kube-config by file path.
@@ -33,16 +32,38 @@ func parse2Config(path string) model.Config {
 	return auth
 }
 
-func separator(config model.Config) map[string]model.Config {
-	eachCluster := make(map[string]model.Config)
+func separator(configList []model.Config) []model.MidConfigWare {
+	allMidConfWare := make([]model.MidConfigWare, 0)
+	for _, config := range configList {
+		if len(config.Clusters) != len(config.Contexts) {
+			log.Fatalln("only support the same num config.")
+		}
+		allMidConfWare = append(allMidConfWare, filter2MidWare(config)...)
+	}
+	return filterDuplicates(allMidConfWare)
+}
 
-	if len(config.Clusters) != len(config.Contexts) {
-		log.Fatalln("only support the same num config.")
+func filterDuplicates(mayDupWare []model.MidConfigWare) []model.MidConfigWare {
+	if len(mayDupWare) <= 1 {
+		return mayDupWare
+	}
+	noduplicate := make([]model.MidConfigWare, 0)
+	for _, item := range mayDupWare {
+		if len(noduplicate) == 0 {
+			noduplicate = append(noduplicate, item)
+		} else {
+			for _index, _item := range noduplicate {
+				if reflect.DeepEqual(item, _item) {
+					break
+				}
+				if _index == len(noduplicate)-1 {
+					noduplicate = append(noduplicate, item)
+				}
+			}
+		}
 	}
 
-	filter2MidWare(config)
-
-	return eachCluster
+	return noduplicate
 }
 
 func filter2MidWare(config model.Config) []model.MidConfigWare {
@@ -50,33 +71,31 @@ func filter2MidWare(config model.Config) []model.MidConfigWare {
 	contextMap := map2Context(config)
 	userMap := map2User(config)
 
-	log.Println("cluster:", clusterMap, "\ncontextMap:", contextMap, "\nuserMap", userMap)
-
-	//var midWareMap map[string]model.MidConfigWare
+	midWareSlice := make([]model.MidConfigWare, 0)
 	//may lost context name.
 	for _, v := range contextMap {
 
 		temp := model.MidConfigWare{
 			Context: v,
 		}
-		cluster, ok := clusterMap[v.Context.Cluster]
-		if ok {
+
+		if cluster, ok := clusterMap[v.Context.Cluster]; ok {
 			temp.Cluster = cluster
 		} else {
-			//TODO
-			log.Fatalln("the cluster not exist!")
+			log.Debugf("the cluster not exist!")
 		}
 
-		user, ok := userMap[v.Context.User]
-		if ok {
+		if user, ok := userMap[v.Context.User]; ok {
 			temp.User = user
 		} else {
-			//TODO
-			log.Fatalln("the user not exist!")
+			log.Debugf("the user not exist!")
 		}
 
+		if temp.Valid() {
+			midWareSlice = append(midWareSlice, temp)
+		}
 	}
-	return nil
+	return midWareSlice
 }
 
 // map to dict, cluster server url as key
@@ -84,10 +103,10 @@ func map2Cluster(clusters model.Config) map[string]model.Clusters {
 	clusterMap := make(map[string]model.Clusters)
 	for _, cluster := range clusters.Clusters {
 		if cluster.Cluster.Server == "" {
-			log.Println("the server url is empty, skip current clusters.")
+			log.Debugf("the server url is empty, skip current clusters.")
 			continue
 		}
-		clusterMap[cluster.Cluster.Server] = cluster
+		clusterMap[cluster.Name] = cluster
 	}
 	return clusterMap
 }
@@ -98,7 +117,7 @@ func map2Context(clusters model.Config) map[string]model.Contexts {
 	clusterMap := make(map[string]model.Contexts)
 	for _, context := range clusters.Contexts {
 		if context.Name == "" {
-			log.Println("the context name is empty, skip current context.")
+			log.Debugf("the context name is empty, skip current context.")
 			continue
 		}
 		clusterMap[context.Name] = context
@@ -112,7 +131,7 @@ func map2User(clusters model.Config) map[string]model.Users {
 	clusterMap := make(map[string]model.Users)
 	for _, user := range clusters.Users {
 		if user.Name == "" {
-			log.Println("the user name is empty, skip current context.")
+			log.Debugf("the user name is empty, skip current context.")
 			continue
 		}
 		clusterMap[user.Name] = user

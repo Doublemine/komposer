@@ -119,3 +119,12 @@ type MidConfigWare struct {
 	Context Contexts
 	User    Users
 }
+
+func (ware *MidConfigWare) Valid() bool {
+	if ware == nil {
+		return false
+	} else if ware.User.Valid() && ware.Context.Valid() && ware.Cluster.Valid() {
+		return true
+	}
+	return false
+}
