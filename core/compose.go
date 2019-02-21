@@ -1,21 +1,91 @@
 package core
 
 import (
-	"fmt"
 	"github.com/Doublemine/komposer/model"
+	"github.com/mitchellh/go-homedir"
 	log "github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v2"
 	"io/ioutil"
+	"os"
+	"path/filepath"
 	"reflect"
+	"regexp"
 )
 
-func Compose(paths []string, isForce bool, isSpecial bool) {
+var (
+	//auto append suffix
+	duplicateSuffix = "-k6r"
+	match           = regexp.MustCompile("(" + duplicateSuffix + ")+")
+)
+
+const (
+	DEFAULT_KUBECONFIG_NAME  = "cluster.kubeconfig"
+	USER_DIR_KUBECONFIG_NAME = "config"
+	KUBE_DIR                 = ".kube"
+)
+
+func Compose(paths []string, isForce bool, isSpecial bool, suffix string) {
+	if len(suffix) > 0 {
+		duplicateSuffix = suffix
+	}
 	var configList []model.Config
 	for _, path := range paths {
 		configList = append(configList, parse2Config(path))
 	}
 	conbin := separator(configList)
-	fmt.Println(len(conbin))
+	config := merge2Config(conbin)
+	writeConfig2File(config, isSpecial, isForce)
+
+}
+
+func merge2Config(data []model.MidConfigWare) model.Config {
+	renameWare := make([]model.MidConfigWare, 0)
+	for _, item := range data {
+		if len(renameWare) <= 0 {
+			renameWare = append(renameWare, item)
+		} else {
+			for _, _item := range renameWare {
+				renameDuplicateName(_item, &item)
+			}
+			renameWare = append(renameWare, item)
+		}
+	}
+	contexts := make([]model.Contexts, 0)
+	clusters := make([]model.Clusters, 0)
+	users := make([]model.Users, 0)
+
+	for _, item := range renameWare {
+		contexts = append(contexts, item.Context)
+		clusters = append(clusters, item.Cluster)
+		users = append(users, item.User)
+	}
+
+	return model.Config{
+		ApiVersion:     "v1",
+		Kind:           "Config",
+		CurrentContext: contexts[0].Name,
+		Preferences:    model.Preferences{},
+		Users:          users,
+		Clusters:       clusters,
+		Contexts:       contexts,
+	}
+}
+
+func renameDuplicateName(name model.MidConfigWare, todo *model.MidConfigWare) {
+	if name.Cluster.Name == todo.Cluster.Name {
+		todo.Cluster.Name += duplicateSuffix
+		todo.Context.Context.Cluster += duplicateSuffix
+	}
+
+	if name.User.Name == todo.User.Name {
+		todo.User.Name += duplicateSuffix
+		todo.Context.Context.User += duplicateSuffix
+	}
+
+	if name.Context.Name == todo.Context.Name {
+		todo.Context.Name += duplicateSuffix
+	}
+
 }
 
 // parse to kube-config by file path.
@@ -30,6 +100,41 @@ func parse2Config(path string) model.Config {
 		log.Fatal("the file: " + path + " can not resolve")
 	}
 	return auth
+}
+
+// parse to kube-config by file path.
+func writeConfig2File(config model.Config, isSpecial bool, isForce bool) {
+
+	var path string
+	if isSpecial {
+		dir, err := homedir.Dir()
+		if err != nil {
+			log.Fatalln("can not found homedir, error:", err)
+		}
+		path = filepath.Join(dir, KUBE_DIR, USER_DIR_KUBECONFIG_NAME)
+
+		_, _err := os.Stat(filepath.Join(dir, KUBE_DIR))
+		if _err != nil && os.IsNotExist(_err) {
+			_ = os.MkdirAll(filepath.Join(dir, KUBE_DIR), os.ModePerm)
+		}
+	} else {
+		path = DEFAULT_KUBECONFIG_NAME
+	}
+
+	if !isForce && FileExist(path) {
+		log.Infof("the config already exists, you can use flag: --force to overwrite it.")
+		os.Exit(0)
+	}
+
+	content, err := yaml.Marshal(config)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = ioutil.WriteFile(path, content, os.ModePerm)
+	if err != nil {
+		log.Fatalf("write config to %s failed!", path)
+	}
 }
 
 func separator(configList []model.Config) []model.MidConfigWare {
@@ -47,8 +152,21 @@ func filterDuplicates(mayDupWare []model.MidConfigWare) []model.MidConfigWare {
 	if len(mayDupWare) <= 1 {
 		return mayDupWare
 	}
-	noduplicate := make([]model.MidConfigWare, 0)
+
+	noSuffix := make([]model.MidConfigWare, 0)
 	for _, item := range mayDupWare {
+		item.Cluster.Name = match.ReplaceAllString(item.Cluster.Name, ``)
+		item.User.Name = match.ReplaceAllString(item.User.Name, ``)
+		item.Context.Name = match.ReplaceAllString(item.Context.Name, ``)
+		item.Context.Context.User = match.ReplaceAllString(item.Context.Context.User, ``)
+		item.Context.Context.Cluster = match.ReplaceAllString(item.Context.Context.Cluster, ``)
+		noSuffix = append(noSuffix, item)
+	}
+	//cleanup slice
+	mayDupWare = mayDupWare[:0]
+
+	noduplicate := make([]model.MidConfigWare, 0)
+	for _, item := range noSuffix {
 		if len(noduplicate) == 0 {
 			noduplicate = append(noduplicate, item)
 		} else {

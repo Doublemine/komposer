@@ -12,7 +12,7 @@ func KubeConfigVerifier(args []string) error {
 	}
 
 	for _, path := range args {
-		if !PathExist(path) {
+		if !FileExist(path) {
 			return errors.New("the config file path: " + path + " not exist or it's a directory, please check it.")
 		}
 	}
@@ -20,7 +20,7 @@ func KubeConfigVerifier(args []string) error {
 	return nil
 }
 
-func PathExist(path string) bool {
+func FileExist(path string) bool {
 	fi, err := os.Stat(path)
 	if err != nil && os.IsNotExist(err) {
 		return false

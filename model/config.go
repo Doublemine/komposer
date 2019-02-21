@@ -128,3 +128,6 @@ func (ware *MidConfigWare) Valid() bool {
 	}
 	return false
 }
+
+type Preferences struct {
+}
