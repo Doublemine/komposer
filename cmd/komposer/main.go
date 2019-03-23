@@ -15,13 +15,14 @@ func main() {
 	special := parser.Flag("s", "special", &argparse.Options{Required: false, Help: "save on user dir after compose"})
 	configList := parser.List("c", "config", &argparse.Options{Required: false, Help: "the kubeconfig file path, can be repeat. such as: -c /path/to/config -c /path/to/others "})
 	duplicateSuffix := parser.String("r", "suffix", &argparse.Options{Required: false, Help: "the duplicates config name automation append suffix, default: -k6r"})
-
+	debug := parser.Flag("d", "debug", &argparse.Options{Required: false, Help: "enable debug log output"})
 	// Parse input
 	err := parser.Parse(os.Args)
 	if err != nil {
 		// In case of error print error and print usage
 		// This can also be done by passing -h or --help flags
 		fmt.Println(parser.Usage(err))
+		os.Exit(0)
 	}
 
 	if *version {
@@ -35,7 +36,7 @@ func main() {
 			fmt.Println(parser.Usage(err))
 			return
 		}
-		core.Compose(*configList, *force, *special, *duplicateSuffix)
+		core.Compose(*configList, *force, *special, *duplicateSuffix, *debug)
 		return
 	}
 

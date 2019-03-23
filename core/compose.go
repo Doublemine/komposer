@@ -19,21 +19,24 @@ var (
 )
 
 const (
-	DEFAULT_KUBECONFIG_NAME  = "cluster.kubeconfig"
-	USER_DIR_KUBECONFIG_NAME = "config"
-	KUBE_DIR                 = ".kube"
+	DefaultKubeconfigName = "cluster.kubeconfig"
+	UserDirKubeconfigName = "config"
+	KubeDir               = ".kube"
 )
 
-func Compose(paths []string, isForce bool, isSpecial bool, suffix string) {
+func Compose(paths []string, isForce bool, isSpecial bool, suffix string, debug bool) {
 	if len(suffix) > 0 {
 		duplicateSuffix = suffix
+	}
+	if debug {
+		log.SetLevel(log.DebugLevel)
 	}
 	var configList []model.Config
 	for _, path := range paths {
 		configList = append(configList, parse2Config(path))
 	}
-	conbin := separator(configList)
-	config := merge2Config(conbin)
+	midConfigWares := separator(configList)
+	config := merge2Config(midConfigWares)
 	writeConfig2File(config, isSpecial, isForce)
 
 }
@@ -111,14 +114,14 @@ func writeConfig2File(config model.Config, isSpecial bool, isForce bool) {
 		if err != nil {
 			log.Fatalln("can not found homedir, error:", err)
 		}
-		path = filepath.Join(dir, KUBE_DIR, USER_DIR_KUBECONFIG_NAME)
+		path = filepath.Join(dir, KubeDir, UserDirKubeconfigName)
 
-		_, _err := os.Stat(filepath.Join(dir, KUBE_DIR))
+		_, _err := os.Stat(filepath.Join(dir, KubeDir))
 		if _err != nil && os.IsNotExist(_err) {
-			_ = os.MkdirAll(filepath.Join(dir, KUBE_DIR), os.ModePerm)
+			_ = os.MkdirAll(filepath.Join(dir, KubeDir), os.ModePerm)
 		}
 	} else {
-		path = DEFAULT_KUBECONFIG_NAME
+		path = DefaultKubeconfigName
 	}
 
 	if !isForce && FileExist(path) {
